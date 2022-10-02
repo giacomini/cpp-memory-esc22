@@ -1,0 +1,570 @@
+% !TeX root = cpp-esc22.tex
+
+\section{Algorithms and functions}
+
+\begin{frame}{The C++ standard library}
+
+  \begin{itemize}[<+->]
+  \item The standard library contains components of general use
+    \begin{itemize}[<.->]
+    \item \alert<2>{containers (data structures)}
+    \item \alert<2>{algorithms}
+    \item strings
+    \item input/output
+    \item random numbers
+    \item regular expressions
+    \item concurrency and parallelism
+    \item filesystem
+    \item ...
+    \end{itemize}
+
+  \item The subset containing containers and algorithms is
+    known as STL (Standard Template Library)
+  \item But templates are everywhere
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{STL Algorithms}
+
+  \begin{itemize}[<1->]
+  \item Generic functions that operate on \alert{ranges} of objects
+  \item Implemented as function templates
+  \end{itemize}
+
+  \pause
+
+  \begin{description}[<+->]
+    \item[Non-modifying] \code{all\_of any\_of for\_each
+      count count\_if mismatch equal find find\_if adjacent\_find search ...}
+    \item[Modifying] \code{copy fill generate transform remove
+      replace swap reverse rotate shuffle sample unique ...}
+    \item[Partitioning] \code{partition stable\_partition ...}
+    \item[Sorting] \code{sort partial\_sort nth\_element ... }
+    \item[Set] \code{set\_union set\_intersection set\_difference
+      ...}
+    \item[Min/Max] \code{min max minmax lexicographical\_compare
+      clamp ...}
+    \item[Numeric] \code{iota accumulate inner\_product partial\_sum
+      adjacent\_difference ...}
+  \end{description}
+\end{frame}
+
+\begin{frame}{Range}
+
+  \begin{itemize}[<+->]
+  \item A range is defined by a pair of \alert{iterators}
+    [\textit{first}, \textit{last}), with \textit{last} referring to one
+    past the last element in the range
+    \begin{itemize}
+    \item the range is \textit{half-open}
+    \item \textit{first} == \textit{last} means the range is empty
+    \item \textit{last} can be used to return failure
+    \end{itemize}
+  \item An \alert{iterator} allows to go through the elements of the associated
+    range
+    \begin{itemize}
+    \item operations to advance, access, compare
+    \item typically obtained from containers calling specific methods
+    \end{itemize}
+  \item An iterator is a generalization of a pointer
+    \begin{itemize}
+    \item it supports the same operations, possibly through overloaded operators
+    \item certainly \code{* ++ -> == !=}, maybe \code{-{}- + - += -= <}
+    \end{itemize}
+  \item C++20 introduced \code{ranges}, a new library of \textit{concepts} and components for dealing with ranges of
+    objects (not discussed here)
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Range \insertcontinuationtext}
+
+  \begin{tikzpicture}
+    [anchor=south west]
+    \visible<1->{\node at (0,0) [memory] {};}
+    \visible<1->{\node at (0,0) [word anchor,label={90:{\tiny\tt 0x0000}}] {};}
+    \visible<1->{\node at (.9\textwidth-.25cm,0) [word anchor,label={90:{\tiny\tt 0xffff}}] {};}
+
+    \visible<1->{\node at (3.9,-0.1) [
+        rectangle,
+        fill=green!10!white,
+        draw=black!40,
+        minimum width=3.2cm,
+        minimum height=0.7cm,
+        label=270:{\scriptsize\tt a},
+      ] {};
+    }
+    \visible<1->{\node (a0) at (4,0) [word] {\scriptsize\tt\alert<5>{123}};}
+    \visible<1->{\node (a1) at (5,0) [word] {\scriptsize\tt\alert<8>{456}};}
+    \visible<1->{\node (a2) at (6,0) [word] {\scriptsize\tt\alert<11>{789}};}
+    \visible<1->{\node (a3) at (7,0) [phantom word] {};}
+    \visible<1->{\node at (4,0) [word anchor,label={90:{\tiny\tt 0xab00}}] {};}
+    \visible<1->{\node at (5,0) [word anchor,label={90:{\tiny\tt 0xab04}}] {};}
+    \visible<1->{\node at (6,0) [word anchor, label={90:{\tiny\tt 0xab08}}] {};}
+    \visible<1->{\node at (7,0) [word anchor, label={90:{\tiny\tt0xab0c}}] {};}
+    \visible<2->{\node (first) at (4,-1.5) [word, label={270:{\scriptsize\tt first}}] {};}
+    \visible<3->{\node (last) at (7,-1.5) [word, label={270:{\scriptsize\tt last}}] {};}
+    \visible<2-5>{\draw[->] (first.north) -- (a0.south);}
+    \visible<3->{\draw[->] (last.north) --  (a3.south);}
+    \visible<6-8>{\draw[->] (first.north) -- (a1.south);}
+    \visible<9-11>{\draw[->] (first.north) -- (a2.south);}
+    \visible<12->{\draw[->] (first.north) -- (a3.south);}
+
+  \end{tikzpicture}
+
+  \begin{codeblock}
+\uncover<1->{std::array\invisible<16>{<int,3>} a = \{123, 456, 789\};\uncover<16>{ // \alert{CTAD}}}
+\uncover<2->{\alert<2>{auto first = a.begin();}       // or std::begin(a)}
+\uncover<3->{\alert<3>{auto\only<14->{\alert<14>{ const}} last = a.end();}\only<-13>{      }    // or std::end(a)}
+\uncover<4->{while (\alert<4,7,10,13>{first != last}) \{       // comparison
+  ... \alert<5,8,11>{*first} ...;             // access
+  \alert<6,9,12>{++first};                    // advance
+\}}\end{codeblock}
+
+  \begin{itemize}[<15->]
+  \item \code{std::array<T>::iterator} models the \textit{RandomAccessIterator} concept
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Generic programming}
+
+  \begin{itemize}[<+->]
+  \item A style of programming in which \alert{algorithms} are written
+    in terms of \alert{concepts}
+
+  \begin{codeblock}<+->
+template <class Iterator, class T>
+Iterator
+find(Iterator first, Iterator last, const T\& value)
+\{
+  for (; first \alert{!=} last; \alert{++}first)
+    if (\alert{*}first \alert{==} value)
+      break;
+  return first;
+\}\end{codeblock}
+
+  \item A concept is a set of requirements that a type needs to satisfy
+    \begin{itemize}[<.->]
+    \item e.g. supported expressions, nested types, memory layout, \ldots
+    \end{itemize}
+  \end{itemize}
+
+
+\end{frame}
+
+\begin{frame}[fragile]{Range \insertcontinuationtext}
+
+  \begin{tikzpicture}
+    [anchor=south west]
+    \visible<1->{\node at (0,0) [memory] {};}
+    \visible<1->{\node at (0,0) [word anchor,label={90:{\tiny\tt 0x0000}}] {};}
+    \visible<1->{\node at (.9\textwidth-.25cm,0) [word anchor,label={90:{\tiny\tt 0xffff}}] {};}
+
+    \visible<1->{\node (l) at (0.9,-0.1) [
+        rectangle,
+        fill=green!10!white,
+        draw=black!40,
+        minimum width=1.2cm,
+        minimum height=0.7cm,
+        label=270:{\scriptsize\tt l},
+      ] {};
+    }
+    \visible<1->{\node (a0) at (3.5,0) [word] {\scriptsize\tt\alert<5>{123}};}
+    \visible<1->{\node (a1) at (6.5,0) [word] {\scriptsize\tt\alert<8>{456}};}
+    \visible<1->{\node (a2) at (5  ,0) [word] {\scriptsize\tt\alert<11>{789}};}
+    \visible<1->{\node (a3) at (8  ,0) [phantom word,draw=black,densely dotted] {};}
+    \visible<1->{\node (c0) at (3.5,0) [word anchor,label={90:{\tiny\tt 0xab00}}] {};}
+    \visible<1->{\node (c1) at (6.5,0) [word anchor,label={90:{\tiny\tt 0xad08}}] {};}
+    \visible<1->{\node (c2) at (5,0) [word anchor, label={90:{\tiny\tt 0xac04}}] {};}
+    \visible<1->{\node (c3) at (8,0) [word anchor] {};}
+    \visible<1->{\draw[Circle-Stealth,black!50] (l.east) .. controls +(1,1) .. (c0.north);}
+    \visible<1->{\draw[Circle-Stealth,black!50] (a0.east) .. controls +(1,1.5) .. (c1.north);}
+    \visible<1->{\draw[Circle-Stealth,black!50] (a1.east) .. controls +(-1,1) .. (c2.north);}
+    \visible<1->{\draw[Circle-Stealth,black!50] (a2.east) .. controls +(1,1.5) .. (c3.north);}
+    %    \visible<1->{\node at (3,0) [word anchor,label={90:{\tiny\tt 0xab00}}] {};}
+    \visible<2->{\node (first) at (3.5,-1.5) [word, label={270:{\scriptsize\tt first}}] {};}
+    \visible<3->{\node (last) at (8,-1.5) [word, label={270:{\scriptsize\tt last}}] {};}
+    \visible<2-5>{\draw[->] (first.north) -- (a0.south);}
+    \visible<3->{\draw[->] (last.north) --  (a3.south);}
+    \visible<6-8>{\draw[->] (first.north) -- (a1.south);}
+    \visible<9-11>{\draw[->] (first.north) -- (a2.south);}
+    \visible<12->{\draw[->] (first.north) -- (a3.south);}
+
+  \end{tikzpicture}
+
+  \begin{codeblock}
+\uncover<1->{std::forward\_list<int> l = \{123, 456, 789\};}
+\uncover<2->{\alert<2>{auto first = l.begin();}}
+\uncover<3->{\alert<3>{auto const last = l.end();}}
+\uncover<4->{while (\alert<4,7,10,13>{first != last}) \{
+  ... \alert<5,8,11>{*first} ...;
+  \alert<6,9,12>{++first};
+\}}\end{codeblock}
+
+  \begin{itemize}[<14->]
+  \item \code{std::forward\_list<T>::iterator} models the \textit{ForwardIterator} concept
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Algorithms and ranges}
+
+  \begin{itemize}
+  \item Examples
+    \begin{codeblock}
+std::vector v = \{ 23, 54, 41, 0, 18 \};
+
+// sort the vector in ascending order
+std::sort(std::begin(v), std::end(v));
+
+// sum up the vector elements, initializing the sum to 0
+auto s = std::accumulate(std::begin(v), std::end(v), 0);
+auto r = std::reduce(std::begin(v), std::end(v));
+
+// append the partial sums of the vector elements into a list
+std::list<int> l;
+std::partial\_sum(std::begin(v), std::end(v), std::back\_inserter(l));
+
+// find the first element with value 42
+auto it = std::find(std::begin(v), std::end(v), 42);
+    \end{codeblock}
+
+  \item Some algorithms are customizable passing a function
+    \begin{codeblock}
+auto it = std::find_if(v.begin(), v.end(), \alert{\textit{filter}});\end{codeblock}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Hands-on}
+  \begin{itemize}
+  \item C++ $\rightarrow$ Algorithms
+  \item Starting from \code{algo.cpp} and following the hints, write code to
+    \begin{itemize}
+    \item sum all the elements of the vector
+    \item compute the average of the first half and of the second half of the
+      vector
+    \item move the three central numbers to the beginning
+    \item remove duplicate elements
+    \item \ldots
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Why using standard algorithms}
+
+  \begin{itemize}[<+->]
+  \item They are correct
+  \item They express intent more clearly than a raw \code{for} loop
+  \item They enable \textit{parallelism for the masses}
+    \begin{itemize}[<.->]
+    \item parallel algorithms available in C++17, implementations are appearing
+    \end{itemize}
+  \end{itemize}
+
+  \begin{codeblock}<+->{
+#include <execution>
+
+std::vector<int> v = \ddd;
+std::sort(\alert{std::execution::par}, v.begin(), v.end());
+auto it = std::find(\alert{std::execution::par}, v.begin(), v.end(), 42);}\end{codeblock}
+
+\end{frame}
+
+\begin{frame}{Hands-on}
+  \begin{itemize}
+  \item C++ $\rightarrow$ Algorithms
+  \item Starting from \code{algo\_par.cpp} and following the hints, write code to
+    \begin{itemize}
+    \item sum all the elements of the vector, with and without parallelization
+    \item sort the vector, with and without parallelization
+    \item \ldots
+    \end{itemize}
+    and compare the execution times.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Functions}
+
+  \begin{itemize}
+  \item<1-> A function associates a sequence of statements (the function
+    \textit{body}) with a name and a list of zero or more parameters
+
+  \begin{codeblock}<2->
+\alt<2>{std::string}{\alert<3>{auto        }} join(std::string const\& s, int i)
+\{
+  return s + \upquote{-} + std::to\_string(i);
+\}
+
+join("XYZ", 5); // std::string\{"XYZ-5"\}\end{codeblock}
+
+  \item<4-> A function may return a value
+  \item<5-> A function returning a \code{bool} is called a \textit{predicate}
+    \begin{codeblock}
+\alert<5>{bool} less(int n, int m) \{ return n < m; \}\end{codeblock}
+
+  \item<6-> Multiple functions can have the same name $\rightarrow$
+    \textit{overloading}
+    \begin{itemize}
+    \item different parameter lists
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Algorithms and functions}
+
+  \begin{codeblock}{\tiny
+template <class Iterator, class T>
+Iterator find(Iterator first, Iterator last, \alert{const T\& value})
+\{
+  for (; first != last; ++first)
+    if (\alert{*first == value})
+      break;
+  return first;
+\}
+
+auto it = find(v.begin(), v.end(), 42);}\end{codeblock}
+
+  \begin{codeblock}<2->
+template <class Iterator, class T>
+Iterator find_if(Iterator first, Iterator last, \alert{T pred})
+\{
+  for (; first != last; ++first)
+    if (\alert{pred(*first)})          // unary predicate
+      break;
+  return first;
+\}
+
+\uncover<3->{bool lt42(int n) \{ return n < 42; \}}
+
+\uncover<4->{auto it = find_if(v.begin(), v.end(), lt42);}\end{codeblock}
+
+\end{frame}
+
+\begin{frame}[fragile]{Function objects}
+
+  A mechanism to define \textit{something-callable-like-a-function}
+  \begin{itemize}
+  \item<4-> A class with an \texttt{operator()}
+  \end{itemize}
+
+  \begin{columns}[t]
+
+    \begin{column}{.5\textwidth}
+
+      \begin{codeblock}<2->{
+\invisible{struct LessThan42 \{}
+auto \alert<2,4>{lt42}(int n)
+\{
+  return n < 42;
+\}
+
+\invisible{
+LessThan42 lt42\{\};}
+auto b = \alert<2,7>{lt42(}32\alert<2,7>{)}; // true
+
+\uncover<3->{vector v\{61,32,51\};
+auto it = find_if(
+    begin(v), end(v),
+    \alert<3,8>{lt42}
+); // *it == 32}}\end{codeblock}
+
+    \end{column}
+
+    \begin{column}{.5\textwidth}
+
+      \begin{codeblock}<4->{
+\alert<4>{struct LessThan42 \{}
+  auto \alert<4>{operator()}(int n) \alert<4>{const}
+  \{
+    return n < 42;
+  \}
+\alert<4>{\};}
+
+\uncover<5->{\alt<5>{LessThan42 lt42\{\};}{auto lt42 = LessThan42\{\};}}
+\uncover<7->{auto b = \alert<7>{lt42(}32\alert<7>{)}; // true}
+
+\uncover<8,9>{vector v\{61,32,51\};
+auto it = find_if(
+    begin(v), end(v),
+    \alert{\alt<8>{lt42}{LessThan42\{\}}}
+); // *it == 32}}\end{codeblock}
+
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Function objects \insertcontinuationtext}
+  A function object, being the instance of a class, can have state
+  \begin{codeblock}<2->{
+class LessThan \{
+  \alert<2>{int m\_;}
+ public:
+  explicit \alert<2>{LessThan(int m) : m\_\{m\} \{\}}
+  auto operator()(int n) const \{
+    return n < m_;
+  \}
+\};
+
+\uncover<3->{auto lt42 = LessThan\{42\};
+auto b1 = \alt<-5>{lt42}{\alert<6>{LessThan\{42\}}}(32); // true}
+
+\uncover<4->{auto lt24 = LessThan\{24\};
+auto b2 = \alt<-5>{lt24}{\alert<6>{LessThan\{24\}}}(32); // false}
+
+\uncover<5->{vector v\{61,32,51\};
+auto i1 = find_if(\ldots, \alt<-5>{lt42}{\alert<6>{LessThan\{42\}}}); // *i1 == 32
+auto i2 = find_if(\ldots, \alt<-5>{lt24}{\alert<6>{LessThan\{24\}}}); // i2 == end, i.e. not found}}\end{codeblock}
+
+  \uncover<6>{}
+
+\end{frame}
+
+\begin{frame}[fragile]{Function objects \insertcontinuationtext}
+  An example from the standard library
+
+  \begin{codeblock}
+#include <random>
+
+// random bit generator
+std::default_random_engine gen;
+
+// generate N 32-bit unsigned integer numbers
+for (int n = 0; n != N; ++n) \{
+  std::cout <{}< \alert{gen()} <{}< \bslashn;
+\}
+
+// generate N floats distributed normally (mean: 0., stddev: 1.)
+std::normal_distribution<float> dist;
+for (int n = 0; n != N; ++n) \{
+  std::cout <{}< \alert{dist(gen)} <{}< \bslashn;
+\}
+
+// generate N ints distributed uniformly between 1 and 6 included
+std::uniform\_int\_distribution<> roll\_dice(1, 6);
+for (int n = 0; n != N; ++n) \{
+  std::cout <{}< \alert{roll\_dice(gen)} <{}< \bslashn;
+\}\end{codeblock}
+
+\end{frame}
+
+\begin{frame}[fragile]{Lambda expression}
+
+  \begin{itemize}
+  \item A concise way to create an unnamed function object
+  \item Useful to pass actions/callbacks to algorithms, threads, frameworks,
+    \ldots
+  \end{itemize}
+
+  \begin{columns}[t]
+
+    \begin{column}{.5\textwidth}
+      \begin{codeblock}<2->{
+struct LessThan42 \{
+  auto operator()(int n)
+  \{
+    return n < 42;
+  \}
+\};
+
+class LessThan \{
+  int m\_;
+ public:
+  explicit LessThan(int m)
+    : m\_\{m\} \{\}
+  auto operator()(int n) const
+  \{
+    return n < m_;
+  \}
+\};}\end{codeblock}
+
+    \end{column}
+
+    \begin{column}{.5\textwidth}
+      \begin{codeblock}<2->{
+find_if(\ldots, LessThan42\{\});
+
+\uncover<3->{find_if(\ldots, \alert<3>{[](int n) \{}
+               return n < 42;
+             \alert<3>{\}}
+);}
+
+find_if(\ldots, LessThan\{42\});
+
+\uncover<4->{\only<4>{\alert{int m\{42\};}}
+find_if(\ldots, [\alert<4->{\only<4>{=}\only<5>{m = 42}}](int n) \{
+              return n < \alert<4->{m};
+             \}
+);}}\end{codeblock}
+    \end{column}
+
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Lambda expression \insertcontinuationtext}
+  The evaluation of a lambda expression produces an unnamed function object (a
+  \textit{closure})
+  \begin{itemize}
+  \item The \texttt{operator()} corresponds to the code of the body of the
+    lambda expression
+  \item The data members are the captured local variables
+
+    \begin{itemize}
+    \item \texttt{[]} capture nothing
+    \item \texttt{[=]} capture all by value
+    \item \texttt{[k]} capture \texttt{k} by value
+    \item \texttt{[\&]} capture all by reference
+    \item \texttt{[\&k]} capture \texttt{k} by reference
+    \item \texttt{[=, \&k]} capture all by value but \texttt{k} by reference
+    \item \texttt{[\&, k]} capture all by reference but \texttt{k} by value
+    \end{itemize}
+
+  \item Global variables are available without being captured
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Hands-on}
+  \begin{itemize}
+  \item C++ $\rightarrow$ Algorithms
+  \item Starting from \code{algo\_functions.cpp} and following the hints, write
+    code to
+    \begin{itemize}
+    \item multiply all the elements of the vector
+    \item sort the vector in descending order
+    \item move the even numbers to the beginning
+    \item create another vector with the squares of the numbers in the first vector
+    \item find the first multiple of 3 or 7
+    \item erase from the vector all the multiples of 3 or 7
+    \item \ldots
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{std::function}}
+  \begin{itemize}
+  \item Type-erased wrapper that can store and invoke any callable entity with a certain signature
+    \begin{itemize}
+    \item function, function object, lambda, member function
+    \end{itemize}
+  \item Some space and time overhead, so use only if a template parameter is not satisfactory
+  \end{itemize}
+
+  \begin{codeblock}<2->{
+#include <functional>
+#include <iostream>
+
+\alert{int} sum\_squares\alert{(int} x\alert{, int} y\alert{)} \{ return x * x + y * y; \}
+
+int main() \{
+  std::vector<std::function<\alert{int(int, int)}>{}> v \{
+    std::plus<>\{\},       // has a compatible operator()
+    std::multiplies<>\{\}, // idem
+    \&sum\_squares
+  \};
+  for (int k = 10; k <= 1000; k *= 10) \{
+    v.push\_back([k]\alert{(int} x\alert{, int} y\alert{)} -> \alert{int} \{ return k * x + y; \});
+  \}
+  for (auto const\& f : v) \{ std::cout <{}< f(4, 5) <{}< \bslashn; \}
+\}}\end{codeblock}
+
+\end{frame}

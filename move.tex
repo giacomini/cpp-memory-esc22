@@ -1,0 +1,629 @@
+% !TeX root = cpp-esc22.tex
+
+\section{Move semantics}
+
+\begin{frame}[fragile]{We can do better than copying}
+
+  \begin{columns}
+    \begin{column}{.45\textwidth}
+
+      \begin{codeblock}{\tiny
+class String \{
+  char* s\_;
+  \ddd
+\};}\end{codeblock}
+
+      \begin{codeblock}<1->{\tiny
+String s1\{"Hi!"\};
+\uncover<2->{String s2\{s1\};}}\end{codeblock}
+
+  \uncover<3->{\small
+    \begin{itemize}
+    \item Both \code{s1} and \code{s2} exist at the end
+    \item The ``deep'' copy is needed
+    \end{itemize}
+  }
+
+  \begin{codeblock}<4->{\tiny
+String get\_string() \{ return "Hi!"; \}
+String \alert<6>{s3}\{\alert<5>{get\_string()}\}\alert<7>{;}}\end{codeblock}
+
+  \uncover<8->{\small
+    \begin{itemize}
+    \item Only \code{s3} exists at the end
+    \item The ``deep'' copy is a waste
+    \end{itemize}
+  }
+    \end{column}
+
+    \begin{column}{.55\textwidth}
+      \newcommand*{\stackx}{0.}
+      \newcommand*{\heapx}{3.0}
+
+      \begin{tikzpicture}
+        [anchor=south west]
+        \node at (\stackx,0) [
+          rectangle,
+          minimum width=2cm,
+          minimum height=7cm,
+          draw=black,
+          label={90:{\scriptsize stack}}
+        ] {};
+        \node at (\heapx,0) [
+          rectangle,
+          minimum width=2cm,
+          minimum height=7cm,
+          draw=black,
+          label={90:{\scriptsize heap}}
+        ] {};
+        \node (s1remote) at (\heapx-0.1,5.4) [
+          rectangle,
+          fill=green!10!white,
+          draw=black!40,
+          minimum width=2.2cm,
+          minimum height=0.7cm,
+        ] {};
+        \node at (\heapx,5.5) [
+          rectangle,
+          minimum width=2cm,
+          minimum height=.5cm,
+          draw=black,
+          fill=green!30!white
+        ] {\scriptsize\tt Hi!\bslash{0}};
+        \node at (\heapx,5.5) [
+          rectangle,
+          minimum width=.5cm,
+          minimum height=.5cm,
+          draw=black,
+          densely dotted,
+          label={270:{\tiny\tt 0x4abc}}
+        ] {};
+        \node at (\stackx-0.1,5.4) [
+          rectangle,
+          fill=green!10!white,
+          draw=black!40,
+          minimum width=2.2cm,
+          minimum height=.7cm,
+          label={180:{\scriptsize\tt s1}},
+        ] {};
+        \node (s1pointer) at (\stackx,5.5) [
+          rectangle,
+          minimum width=2cm,
+          minimum height=.5cm,
+          draw=black,
+          fill=green!30!white,
+        ] {\scriptsize\tt 0x4abc};  
+        \draw[->] (s1pointer.east) -- (s1remote.west);
+        \visible<2->{
+          \node (s2remote) at (\heapx-0.1,3.9) [
+            rectangle,
+            fill=green!10!white,
+            draw=black!40,
+            minimum width=2.2cm,
+            minimum height=0.7cm,
+          ] {};
+          \node at (\heapx,4) [
+            rectangle,
+            minimum width=2cm,
+            minimum height=.5cm,
+            draw=black,
+            fill=green!30!white
+          ] {\scriptsize\tt Hi!\bslash{0}};
+          \node at (\heapx,4) [
+            rectangle,
+            minimum width=.5cm,
+            minimum height=.5cm,
+            draw=black,
+            densely dotted,
+            label={270:{\tiny\tt 0x4ab0}}
+          ] {};
+          \node at (\stackx-0.1,3.9) [
+            rectangle,
+            fill=green!10!white,
+            draw=black!40,
+            minimum width=2.2cm,
+            minimum height=.7cm,
+            label={180:{\scriptsize\tt s2}},
+          ] {};
+          \node (s2pointer) at (\stackx,4) [
+            rectangle,
+            minimum width=2cm,
+            minimum height=.5cm,
+            draw=black,
+            fill=green!30!white,
+          ] {\scriptsize\tt 0x4ab0};
+          \draw[->] (s2pointer.east) -- (s2remote.west);
+        }
+        \visible<2>{\path[black!70!white] (s1remote.south) -- (s2remote.north) node[yshift=.25cm,single arrow, draw, shape border rotate=270, single arrow tip angle=120,single arrow head extend=.1cm,minimum height=.5cm,minimum width=1cm] {};
+        }
+        \visible<5-6>{
+          \node (tmpremote) at (\heapx-0.1,1.9) [
+            rectangle,
+            fill=green!10!white,
+            draw=black!40,
+            minimum width=2.2cm,
+            minimum height=0.7cm,
+          ] {};
+          \node at (\heapx,2) [
+            rectangle,
+            minimum width=2cm,
+            minimum height=.5cm,
+            draw=black,
+            fill=green!30!white
+          ] {\scriptsize\tt Hi!\bslash{0}};
+          \node at (\heapx,2) [
+            rectangle,
+            minimum width=.5cm,
+            minimum height=.5cm,
+            draw=black,
+            densely dotted,
+            label={270:{\tiny\tt 0x4aa0}}
+          ] {};
+          \node at (\stackx-0.1,1.9) [
+            rectangle,
+            fill=green!10!white,
+            draw=black!40,
+            minimum width=2.2cm,
+            minimum height=.7cm,
+          ] {};
+          \node (tmppointer) at (\stackx,2) [
+            rectangle,
+            minimum width=2cm,
+            minimum height=.5cm,
+            draw=black,
+            fill=green!30!white,
+          ] {\scriptsize\tt 0x4aa0};
+          \draw[->] (tmppointer) -- (tmpremote);  
+        }
+        \visible<6->{
+          \node (s3remote) at (\heapx-0.1,.4) [
+            rectangle,
+            fill=green!10!white,
+            draw=black!40,
+            minimum width=2.2cm,
+            minimum height=0.7cm,
+          ] {};
+          \node at (\heapx,.5) [
+            rectangle,
+            minimum width=2cm,
+            minimum height=.5cm,
+            draw=black,
+            fill=green!30!white
+          ] {\scriptsize\tt Hi!\bslash{0}};
+          \node at (\heapx,.5) [
+            rectangle,
+            minimum width=.5cm,
+            minimum height=.5cm,
+            draw=black,
+            densely dotted,
+            label={270:{\tiny\tt 0x4aac}}
+          ] {};
+          \node at (\stackx-0.1,.4) [
+            rectangle,
+            fill=green!10!white,
+            draw=black!40,
+            minimum width=2.2cm,
+            minimum height=.7cm,
+            label={180:{\scriptsize\tt s3}},
+          ] {};
+          \node (s3pointer) at (\stackx,.5) [
+            rectangle,
+            minimum width=2cm,
+            minimum height=.5cm,
+            draw=black,
+            fill=green!30!white,
+          ] {\scriptsize\tt 0x4aac};
+          \draw[->] (s3pointer) -- (s3remote);
+        }
+        \visible<6>{\path[black!70!white] (tmpremote.south) -- (s3remote.north) node[yshift=.25cm,single arrow, draw, shape border rotate=270, single arrow tip angle=120,single arrow head extend=.1cm,minimum height=.5cm,minimum width=1cm] {};
+        }
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile]{Copy vs move}
+
+  \begin{columns}
+    \begin{column}{.45\textwidth}
+
+      \begin{codeblock}{\tiny
+\uncover<1->{class String \{
+  char* s\_;
+ public:
+  String(char const* s) \{
+    size\_t size = strlen(s) + 1;
+    s\_ = new char[size];
+    memcpy(s\_, s, size);
+  \}
+  ~String() \{ delete [] s\_; \}}
+\uncover<2->{  // \alert<2>{copy}
+  String(String const& other) \{
+    size\_t size = strlen(other.s\_) + 1;
+    s\_ = new char[size];
+    memcpy(s\_, other.s\_, size);
+  \}}
+\uncover<4->{  // \alert<4-5>{move}
+  String(\alert<7>{???} tmp): s\_(tmp.s\_) \{
+\uncover<5->{    tmp.s\_ = nullptr;}
+  \}}
+\uncover<1->{  \ddd
+\};
+
+String s1\{"Hi!"\};}
+\uncover<2->{String s2\{s1\};}
+\uncover<3->{String \alert<4>{s3}\{\alert<3>{get\_string()}\}\alert<6>{;}}
+}\end{codeblock}
+
+    \end{column}
+
+    \begin{column}{.55\textwidth}
+      \newcommand*{\stackx}{0.}
+      \newcommand*{\heapx}{3.0}
+
+      \begin{tikzpicture}
+        [anchor=south west]
+        \node at (\stackx,0) [
+          rectangle,
+          minimum width=2cm,
+          minimum height=7cm,
+          draw=black,
+          label={90:{\scriptsize stack}}
+        ] {};
+        \node at (\heapx,0) [
+          rectangle,
+          minimum width=2cm,
+          minimum height=7cm,
+          draw=black,
+          label={90:{\scriptsize heap}}
+        ] {};
+        \node (s1remote) at (\heapx-0.1,5.4) [
+          rectangle,
+          fill=green!10!white,
+          draw=black!40,
+          minimum width=2.2cm,
+          minimum height=0.7cm,
+        ] {};
+        \node at (\heapx,5.5) [
+          rectangle,
+          minimum width=2cm,
+          minimum height=.5cm,
+          draw=black,
+          fill=green!30!white
+        ] {\scriptsize\tt Hi!\bslash{0}};
+        \node at (\heapx,5.5) [
+          rectangle,
+          minimum width=.5cm,
+          minimum height=.5cm,
+          draw=black,
+          densely dotted,
+          label={270:{\tiny\tt 0x4abc}}
+        ] {};
+        \node at (\stackx-0.1,5.4) [
+          rectangle,
+          fill=green!10!white,
+          draw=black!40,
+          minimum width=2.2cm,
+          minimum height=.7cm,
+          label={180:{\scriptsize\tt s1}},
+        ] {};
+        \node (s1pointer) at (\stackx,5.5) [
+          rectangle,
+          minimum width=2cm,
+          minimum height=.5cm,
+          draw=black,
+          fill=green!30!white,
+        ] {\scriptsize\tt 0x4abc};
+        \draw[->] (s1pointer.east) -- (s1remote.west);
+        \visible<2->{
+          \node at (\heapx-0.1,3.9) [
+            rectangle,
+            fill=green!10!white,
+            draw=black!40,
+            minimum width=2.2cm,
+            minimum height=0.7cm,
+          ] {};
+          \node at (\heapx,4) [
+            rectangle,
+            minimum width=2cm,
+            minimum height=.5cm,
+            draw=black,
+            fill=green!30!white
+          ] {\scriptsize\tt Hi!\bslash{0}};
+          \node at (\heapx,4) [
+            rectangle,
+            minimum width=.5cm,
+            minimum height=.5cm,
+            draw=black,
+            densely dotted,
+            label={270:{\tiny\tt 0x4ab0}}
+          ] (r2) {};
+          \node at (\stackx-0.1,3.9) [
+            rectangle,
+            fill=green!10!white,
+            draw=black!40,
+            minimum width=2.2cm,
+            minimum height=.7cm,
+            label={180:{\scriptsize\tt s2}},
+          ] {};
+          \node (s2pointer) at (\stackx,4) [
+            rectangle,
+            minimum width=2cm,
+            minimum height=.5cm,
+            draw=black,
+            fill=green!30!white,
+          ] (h2) {\scriptsize\tt 0x4ab0};
+          \draw[->] (s2pointer.east) -- (s2remote.west);
+        }
+        \visible<2>{\path[black!70!white] (s1remote.south) -- (s2remote.north) node[yshift=.25cm,single arrow, draw, shape border rotate=270, single arrow tip angle=120,single arrow head extend=.1cm,minimum height=.5cm,minimum width=1cm] {};
+        }
+        \visible<3->{
+          \node (tmpremote) at (\heapx-0.1,1.9) [
+            rectangle,
+            fill=green!10!white,
+            draw=black!40,
+            minimum width=2.2cm,
+            minimum height=0.7cm,
+          ] {};
+          \node at (\heapx,2) [
+            rectangle,
+            minimum width=2cm,
+            minimum height=.5cm,
+            draw=black,
+            fill=green!30!white
+          ] {\scriptsize\tt Hi!\bslash{0}};
+          \node at (\heapx,2) [
+            rectangle,
+            minimum width=.5cm,
+            minimum height=.5cm,
+            draw=black,
+            densely dotted,
+            label={270:{\tiny\tt 0x4aa0}}
+          ] {};
+        }
+        \visible<3-5>{
+          \node at (\stackx-0.1,1.9) [
+            rectangle,
+            fill=green!10!white,
+            draw=black!40,
+            minimum width=2.2cm,
+            minimum height=.7cm,
+          ] {};
+          \node (tmppointer) at (\stackx,2) [
+            rectangle,
+            minimum width=2cm,
+            minimum height=.5cm,
+            draw=black,
+            fill=green!30!white,
+          ] {\scriptsize\tt \alt<3-4>{\alert<4>{0x4aa0}}{\code{\alert<5>{nullptr}}}};
+        }
+        \visible<3-4>{\draw[->] (tmppointer.east) -- (tmpremote.west);}
+        \visible<4->{
+          \node at (\stackx-0.1,.4) [
+            rectangle,
+            fill=green!10!white,
+            draw=black!40,
+            minimum width=2.2cm,
+            minimum height=.7cm,
+            label={180:{\scriptsize\tt s3}},
+          ] {};
+          \node (s3pointer) at (\stackx,.5) [
+            rectangle,
+            minimum width=2cm,
+            minimum height=.5cm,
+            draw=black,
+            fill=green!30!white,
+          ] {\scriptsize\tt \alert<4>{0x4aa0}};
+          \draw[->] (s3pointer.east) -- ([yshift=-.5ex]tmpremote.west);
+        }
+        \visible<4>{\path[black!70!white] (tmppointer.south) -- (s3pointer.north) node[yshift=.3cm,xshift=-.1cm,single arrow, draw, shape border rotate=270, single arrow tip angle=120,single arrow head extend=.1cm,minimum height=.5cm,minimum width=.4cm] {};
+        }
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{lvalues vs rvalues}
+  \begin{itemize}
+  \item The taxonomy of values in C++ is complex
+    \begin{itemize}
+    \item glvalue, prvalue, xvalue, lvalue, rvalue
+    \end{itemize}
+  \item We can assume
+    \begin{description}
+    \item [lvalue] A named object
+      \begin{itemize}
+      \item for which you can take the address
+      \item \alert{l} stands for ``left'' because it used to represent the
+        \alert{l}eft-hand side of an assignment
+      \end{itemize}
+    \item [rvalue] An unnamed (temporary) object
+      \begin{itemize}
+      \item for which you can't take the address
+      \item \alert{r} stands for ``right'' because it used to represent the
+        \alert{r}ight-hand side of an assignment
+      \end{itemize}
+    \end{description}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Rvalue reference}
+  \begin{itemize}
+  \item A \textbf{\code{T\&\&}} is an rvalue reference
+    \begin{itemize}
+    \item introduced in C++11
+    \end{itemize}
+  \item It binds to rvalues but not to lvalues
+  \end{itemize}
+
+  \begin{codeblock}<2->{\tiny
+class String \{
+  // copy constructor
+  \alert<3>{String(String const& other)} \{ \ddd \}
+  // move constructor
+  \alert<4>{String(String\alert<2>{&&} tmp)} \{ \ddd \}
+\};
+
+\uncover<3->{String s2\{s1\};           // call String::String(String const&)}
+\uncover<4->{String s3\{get_string()\}; // call String::String(String&&)}}\end{codeblock}
+
+\end{frame}
+
+\begin{frame}[fragile]{Special member functions}
+
+  \begin{itemize}
+  \item A class has five special member functions
+    \begin{itemize}
+    \item Plus the default constructor
+    \end{itemize}
+
+    \begin{codeblock}{\tiny
+class Widget \{
+  Widget(Widget const&);            // copy constructor
+  Widget& operator=(Widget const&); // copy assignment
+  Widget(Widget&&);                 // move constructor
+  Widget& operator=(Widget&&);      // move assignment
+  \~Widget();                        // destructor
+\};}\end{codeblock}
+
+  \item<2-> The compiler can generate them automatically according to some
+    convoluted rules
+    \begin{itemize}
+    \item The behavior depends on the behavior of data members
+    \end{itemize}
+  \item<3-> Rules of thumb
+    \begin{description}
+    \item [Rule of zero] Don't declare them and rely on the compiler
+    \item [Rule of five] If you need to declare one, declare them all
+    \end{description}
+    \begin{itemize}
+    \item Consider \code{= default} and \code{= delete}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Hands-on}
+  
+  \begin{itemize}
+  \item C++ $\rightarrow$ Move operations 
+  \item Open the program \code{string.cpp} and complete the existing code to:
+
+    \begin{itemize}
+    \item Complete the set of the special member functions so that \code{String} is copyable and movable
+    \item Instead of a raw pointer, keep a \code{unique\_ptr} in the private part of String
+    \item \ldots
+    \end{itemize}
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Return a value from a function}
+  \begin{itemize}
+  \item Returning a large value from a function is often perceived as slow
+    \begin{itemize}
+
+    \item<2-> Return ``by pointer''
+      \begin{codeblock}
+std::unique\_ptr<LargeObject> make\_large\_object() \{
+  return std::make\_unique<LargeObject>();
+\}
+
+auto lo = make\_large\_object();
+lo->\ddd; // use the object, via a pointer\end{codeblock}
+
+     \item<3-> Use ``out'' arguments
+       \begin{codeblock}
+void make\_large\_object(LargeObject& o) \{
+  o = LargeObject\{\};   // requires copy assignment
+\}
+
+LargeObject lo;        // requires default constructor
+make\_large\_object(lo);
+lo.\ddd                 // use the object\end{codeblock}
+
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Return a value from a function \insertcontinuationtext}
+
+  \begin{itemize}
+  \item There are very few reasons for not doing the obvious
+    \begin{codeblock}
+LargeObject make\_large\_object() \{
+  return LargeObject\{\};
+\}
+
+auto lo = make\_large\_object(); // possibly auto const
+lo.\ddd                         // use the object\end{codeblock}
+
+  \item In fact the compiler is allowed or even obliged in some circumstances to
+    elide the copy of the returned value into the final destination
+    \begin{itemize}
+    \item (N)RVO -- (Named) Return Value Optimization
+    \end{itemize}
+  \item If (N)RVO is not applied, a move is done, if available
+  \item If the move is not available, copy
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Return value optimization}
+
+  \begin{columns}[t]
+
+    \begin{column}{.5\textwidth}
+      Unnamed
+      \begin{codeblock}
+Widget make\_widget()
+\{
+  if (\ddd) \{
+    return Widget\{\};
+  \}
+  return Widget\{\};
+\}
+
+auto w = make\_widget();\end{codeblock}
+    \end{column}
+
+    \begin{column}{.5\textwidth}
+      Named
+
+      \begin{codeblock}
+Widget make\_widget()
+\{
+  Widget result;
+  if (\ddd) \{
+    result = Widget\{\};
+  \}
+  return result;
+\}
+
+auto w = make\_widget();\end{codeblock}
+    \end{column}
+  \end{columns}
+
+  \begin{itemize}[<2->]
+  \item Try not to mix named and unamed \code{return}s in the same function
+  \item Avoid \code{return std::move(result)}, unless necessary
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Hands-on}
+
+  \begin{itemize}
+  \item C++ $\rightarrow$ Return Value Optimization
+  \item Open the program \code{rvo.cpp}. Implement variations of the
+    \code{make_vector} function so that:
+    \begin{itemize}
+    \item the result is returned from the function
+    \item the result is passed to the function as an output parameter (by
+      reference or by pointer)
+    \end{itemize}
+
+  \item Measure the time it takes to execute them. Discuss the results.
+  \end{itemize}
+\end{frame}

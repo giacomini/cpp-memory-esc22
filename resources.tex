@@ -1,0 +1,427 @@
+% !TeX root = cpp-esc22.tex
+
+\section{Resource management}
+
+\begin{frame}[fragile]{Weaknesses of a \texttt{T*}}
+
+  \begin{itemize}[<+->]
+  \item Critical information is not encoded in the type
+    \only<.>{
+      \begin{itemize}[<.>]
+      \item Am I the owner of the pointee? Should I delete it?
+      \item Is the pointee an object or an array of objects? of what size?
+      \item Was it allocated with \texttt{new}, \texttt{malloc} or even something
+        else (e.g. \texttt{fopen} returns a \texttt{FILE*})?
+      \end{itemize}
+    }
+  \item Owning pointers are prone to leaks and double deletes
+  \item Owning pointers are unsafe in presence of exceptions
+  \item Runtime overhead
+    \begin{itemize}
+    \item<.-> dynamic allocation/deallocation
+    \item<.-> indirection
+    \end{itemize}
+  \end{itemize}
+
+  \begin{onlyenv}<1> % \only doesn't work for a verbatim env
+    \begin{codeblock}
+T* p = create\_something();\end{codeblock}
+  \end{onlyenv}
+
+  \begin{onlyenv}<2>
+    \begin{codeblock}
+\{
+  T* p = new T\{\};
+  \ddd
+  // ops, forgot to delete p
+\}
+\{
+  T* p = new T;
+  \ddd
+  delete p;
+  \ddd
+  delete p; // ops, delete again
+\}\end{codeblock}
+  \end{onlyenv}
+
+  \begin{onlyenv}<3>
+    \begin{codeblock}
+\{
+  T* p = new T;
+  \ddd // potentially throwing code
+  delete p;
+\}\end{codeblock}
+  \end{onlyenv}
+
+\end{frame}
+
+\begin{frame}[fragile]{Debugging memory problems}
+
+  \begin{itemize}
+  \item Valgrind is a suite of debugging and profiling tools for memory
+    management, threading, caching, etc.
+  \item Valgrind Memcheck can detect
+    \begin{itemize}
+    \item invalid memory accesses
+    \item use of uninitialized values
+    \item memory leaks
+    \item bad frees
+    \end{itemize}
+  \item It's precise, but slow
+  \end{itemize}
+
+  \begin{onlyenv}<2>
+    \begin{codeblock}
+$ g++ leak.cpp
+$ valgrind ./a.out
+==18331== Memcheck, a memory error detector
+...\end{codeblock}
+  \end{onlyenv}
+
+\end{frame}
+
+\begin{frame}[fragile]{Debugging memory problems \insertcontinuationtext}
+
+  \begin{itemize}
+  \item \textit{Address Sanitizer} (ASan)
+  \item The compiler instruments the executable so that at runtime ASan can
+    catch problems similar, but not identical, to valgrind
+  \item Faster than valgrind
+  \end{itemize}
+
+  \begin{onlyenv}<2>
+    \begin{codeblock}
+$ g++ -fsanitize=address leak.cpp
+$ ./a.out
+
+=================================================================
+==18338==ERROR: LeakSanitizer: detected memory leaks
+\ldots\end{codeblock}
+  \end{onlyenv}
+
+\end{frame}
+
+\begin{frame}{Hands-on}
+  \begin{itemize}
+  \item C++ $\rightarrow$ Memory issues
+  \item Get familiar with Valgrind and memory sanitizers
+  \item Inspect, compile, run directly and run through valgrind or memory
+    sanitizers (not both together)
+    \begin{itemize}
+    \item \code{non\_owning\_pointer.cpp}
+    \item \code{array\_too\_small.cpp}
+    \item \code{leak.cpp}
+    \item \code{double\_delete.cpp}
+    \item \code{missed\_delete.cpp}
+    \end{itemize}
+  \item Try and fix the problems
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{When to use a \code{T*}}
+  \begin{itemize}
+  \item To represent a \textit{link} to an object when
+    \begin{itemize}
+    \item the object is not owned, and
+    \item the link may be null or the link can be re-bound
+    \end{itemize}
+  \item Mutable and immutable scenarios
+    \begin{itemize}
+    \item \code{T*} vs \code{T const*}
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{When \underline{not} to use a \code{T*}}
+  \begin{itemize}
+  \item To represent a link to an object when
+    \begin{itemize}
+    \item the object is owned, or
+    \item the link can never be null, and the link cannot be re-bound
+    \end{itemize}
+  \item Alternatives
+    \begin{itemize}
+    \item use a copy
+    \item use a (const) reference
+      \begin{codeblock}
+T& tr = t1;  // tr is an alias for t1
+tr = t2;     // doesn't re-bind tr, assigns t2 to t1
+
+T* tp = &t1; // tp points to t1
+tp = &t2;    // re-binds tp, it now points to t2\end{codeblock}
+    \item use a resource-managing object
+      \begin{itemize}
+      \item \code{std::array}, \code{std::vector}, \code{std::string},
+        \textit{smart pointers}, \ldots
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Resource management}
+  \begin{itemize}
+  \item Dynamic memory is just one of the many types of resources manipulated by a
+    program:
+    \begin{itemize}
+    \item thread, mutex, socket, file, \ldots
+    \end{itemize}
+  \item C++ offers powerful tools to manage resources
+    \begin{itemize}
+    \item \textit{"C++ is my favorite garbage collected language because it
+      generates so little garbage"}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Smart pointers}
+  \begin{itemize}[<+->]
+  \item Objects that behave like pointers, but also manage the lifetime of the pointee
+  \item Leverage the RAII idiom
+    \begin{itemize}[<.->]
+    \item Resource Acquisition Is Initialization
+    \item Resource (e.g. memory) is acquired in the constructor
+    \item Resource (e.g. memory) is released in the destructor
+    \end{itemize}
+  \item Importance of how the destructor is designed in C++
+    \begin{itemize}[<.->]
+    \item deterministic: guaranteed execution at the end of the scope
+    \item order of execution opposite to order of construction
+    \end{itemize}
+  \item Guaranteed no leak nor double release, even in presence of exceptions
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Smart pointers \insertcontinuationtext}
+  \begin{codeblock}
+template<typename Pointee>
+class SmartPointer \{
+  Pointee* m\_p;
+ public:
+  explicit SmartPointer(Pointee* p): m\_p\{p\} \{\}
+  \~SmartPointer() \{ delete m\_p; \}
+  \visible<3->{Pointee* operator\alert<3>{->}() \{ return m\_p; \}
+  Pointee& operator\alert<3>{*}() \{ return *m\_p; \}}
+  \visible<4->{\ddd}
+\};
+
+class Histo \{ \ddd \};
+
+\{
+  SmartPointer<Histo> sp\{new Histo\{\}\};
+  \visible<2->{sp\alert<2-3>{->}fill();
+  (\alert<2-3>{*}sp).fill();}
+\}\end{codeblock}
+
+At the end of the scope (i.e. at the closing \code{\}}) \code{sp} is destroyed
+and its destructor \code{delete}s the pointee
+
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{std::unique\_ptr<T>}}
+
+  Standard smart pointer
+
+  \begin{itemize}
+  \item Exclusive ownership
+  \item No space nor time overhead
+  \item Non-copyable, movable
+  \end{itemize}
+
+  \begin{codeblock}<2->{
+class Histo \{ \ddd \};
+
+void take(std::unique\_ptr<Histo> ph); \uncover<6>{    \alert{// by value}}
+
+\uncover<3->{std::unique\_ptr<Histo> ph\{new Histo\{\}\};   // explicit new}
+\uncover<4->{auto ph = std::make\_unique<Histo>();      // better}
+\uncover<5->{take(ph);}                                 \uncover<6->{// error, non-copyable}
+\uncover<7->{take(\alert<7>{std::move(}ph\alert<7>{)});}                      \uncover<8->{// ok, movable}}\end{codeblock}
+
+\uncover<9->{NB: \code{std::move} doesn't actually move anything. It just signals to the compiler that it's ok to move
+the object}
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{std::shared\_ptr<T>}}
+
+  Standard smart pointer
+
+  \begin{itemize}
+  \item Shared ownership (reference counted)
+  \item Some space and time overhead
+    \begin{itemize}
+    \item for the management, not for access
+    \end{itemize}
+  \item Copyable and movable
+  \end{itemize}
+
+  \begin{codeblock}<2->{
+class Histo \{ \ddd \};
+
+void take(std::shared\_ptr<Histo> px);
+
+\uncover<3->{std::shared\_ptr<Histo> ph\{new Histo\{\}\}; // explicit new}
+\uncover<4->{auto px = std::make\_shared<Histo>();    // better}
+\uncover<5->{take(px);}                               \uncover<6->{// ok, copyable}
+\uncover<7->{take(std::move(px));}                    \uncover<8->{// ok, movable}}\end{codeblock}
+
+\end{frame}
+
+\begin{frame}[fragile]{Using smart pointers}
+
+    \begin{itemize}[<+->]
+
+    \item Give an owning raw pointer (e.g. the result of a call to \code{new})
+      to a smart pointer as soon as possible
+    \item Prefer \code{unique\_ptr} unless you need \code{shared\_ptr}
+      \begin{itemize}[<.->]
+      \item You can always move a \code{unique\_ptr} into a \code{shared\_ptr}
+      \item But not viceversa
+      \end{itemize}
+
+    \item Access to the raw pointer is available
+      \begin{itemize}[<.->]
+      \item e.g. to pass to legacy APIs
+      \item \code{\textit{smart}\_ptr<T>::get()}
+        \begin{itemize}
+        \item returns a \textbf{non-owning} \code{T*}
+        \end{itemize}
+      \item \code{unique\_ptr<T>::release()}
+        \begin{itemize}
+        \item returns an \textbf{owning} \code{T*}
+        \item must be explicitly managed
+        \end{itemize}
+      \end{itemize}
+
+    \item Arrays are supported
+
+      \begin{codeblock}<.->
+std::unique_ptr<int[]> p\{new int[n]\}; // destructor calls \upquote{delete []}\end{codeblock}
+
+    \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{\textit{smart}\_ptr} and functions}
+
+  Pass a smart pointer to a function only if the function needs to rely on
+  the smart pointer itself
+
+  \begin{itemize}
+
+  \item<2-> by value of a \texttt{unique\_ptr}, to transfer ownership
+    \begin{codeblock}
+void take(std::unique\_ptr<Histo> u);
+auto u = std::make\_unique<Histo>();
+take(u);            // error
+take(std::move(u)); // ok\end{codeblock}
+
+\item<3-> by value of a \texttt{shared\_ptr}, to keep the resource alive
+  \begin{codeblock}
+auto s = std::make\_shared<Histo>();
+std::thread t\{[=] \{ do\_something\_with(s); \}\};\end{codeblock}
+
+\item<4-> by reference, to interact with the smart pointer itself
+  \begin{codeblock}
+void print\_count(std::shared\_ptr<Histo> const& s) \{
+  std::cout <{}< s.use\_count() <{}< '\\n';
+\};
+auto s = std::make\_shared<Histo>();
+print\_count(s);\end{codeblock}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{\textit{smart}\_ptr} and functions \insertcontinuationtext}
+  \begin{itemize}
+  \item Otherwise pass the pointee by (const) reference/pointer
+    \begin{codeblock}<2->
+\uncover<3->{void fill(std::shared\_ptr<Histo> s) \{ if (s) s->fill(); \}}
+\uncover<4->{void fill(Histo* t)                 \{ if (t) t->fill(); \} // better}
+\uncover<5->{void fill(Histo& t)                 \{ t.fill(); \}         // better}
+
+auto s = make\_shared<Histo>();
+\uncover<3->{fill(s);}
+\uncover<4->{fill(s.get());}
+\uncover<5->{if (s) fill(*s);}\end{codeblock}
+
+  \item<6-> Return a \texttt{\textit{smart}\_ptr} from a function if the
+    function has dynamically allocated a resource that is passed to the caller
+
+    \begin{codeblock}
+auto factory() \{ return std::make\_unique<Histo>(); \}
+
+\uncover<7->{auto u = factory();     // std::unique\_ptr<Histo>
+std::shared\_ptr<Histo> s = std::move(u);}
+
+\uncover<8->{std::shared\_ptr<Histo> s = factory();}\end{codeblock}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{\textit{smart}\_ptr} custom deleter}
+  \begin{itemize}
+  \item \texttt{\textit{smart}\_ptr} is a general-purpose resource handler
+  \item The resource release is not necessarily done with \texttt{delete}
+  \item \texttt{unique\_ptr} and \texttt{shared\_ptr} support a
+    \textit{custom deleter}
+  \end{itemize}
+  \begin{columns}[t]
+    \begin{column}{.5\textwidth}
+      \begin{codeblock}<2->{
+FILE* f = std::fopen(\ddd);
+\ddd
+std::fclose(f);}\end{codeblock}
+
+      \uncover<3->{Usual problems:
+      \begin{itemize}
+      \item Who owns the resource?
+      \item Forgetting to release
+      \item Releasing twice
+      \item Early return/throw
+      \end{itemize}}
+
+    \end{column}
+
+    \begin{column}{.5\textwidth}
+      \begin{codeblock}<4->{
+auto f = std::shared\_ptr<FILE>\{
+  std::fopen(\ddd),
+  [](auto p) \{ std::fclose(p); \}
+\};}\end{codeblock}
+
+      \begin{itemize}
+      \item<5-> Wrap the deallocation function in a lambda to be safe in presence of
+        multiple overloads
+      \item<6-> A bit more involved for \code{unique\_ptr}
+      \end{itemize}
+    \end{column}
+
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Hands-on}
+  \begin{itemize}
+  \item C++ $\rightarrow$ Memory issues
+    \begin{itemize}
+    \item Adapt the exercises to use smart pointers, when applicable
+    \item Remember to compile with \code{-fsanitize=address}
+    \end{itemize}
+  \item C++ $\rightarrow$ Managing resources
+  \item Starting from \code{dir.cpp} and following the hints in the file, write
+    code to:
+    \begin{itemize}
+    \item create a smart pointer managing a \code{DIR} resource obtained with
+      the \code{opendir} function call
+    \item associate a deleter to that smart pointer
+    \item implement a function to read the names of the files in that directory
+    \item check if the deleter is called at the right moment
+    \item hide the creation of the smart pointer behind a factory function
+    \item populate a vector of FILEs, properly wrapped in a smart pointer,
+      obtained opening the regular files in that directory
+    \item \ldots
+    \end{itemize}
+  \end{itemize}
+\end{frame}

@@ -1,0 +1,719 @@
+% !TeX root = cpp-esc22.tex
+
+\section{Additional material}
+
+\section*{Type deduction}
+
+\begin{frame}[fragile]{\texttt{auto}}
+  Let the compiler deduce the type of a variable from the initializer
+
+  \begin{codeblock}
+\uncover<1->{auto i = 0;                // int
+auto u = 0U;               // unsigned int
+auto p = &i;               // int*
+auto d = 1.;               // double
+auto c = \upquote{a};              // char
+auto s = "a";              // char const*}
+\uncover<2->{auto t = std::string\{"a"\}; // std::string
+std::vector<std::string> v;
+auto it = std::begin(v);   // std::vector<std::string>::iterator}
+\uncover<3->{using namespace std::chrono\_literals;
+auto u = 1234us;           // std::chrono::microseconds}
+\uncover<4->{auto e;                    // error}\end{codeblock}
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{auto} and references}
+
+  \begin{itemize}
+  \item \texttt{auto} never deduces a reference
+  \item if needed, \code{\&} must be added explicitly
+  \end{itemize}
+
+\begin{codeblock}
+T v;
+
+auto  v1 = v;     // T  -- v1 is a copy of v
+auto\& v2 = v;     // T\& -- v2 is an alias of v
+\alert{auto  v3 = v2;    // T  -- v2 is a copy of v}\end{codeblock}
+
+\end{frame}
+
+\begin{frame}[fragile]{\code{auto} and \code{const}}
+
+  \begin{itemize}
+  \item \code{auto} makes a mutable copy
+  \item \code{auto const} (or \code{const auto}) makes a non-mutable copy
+  \item \code{auto\&} preserves \code{const}-ness
+  \end{itemize}
+
+  \begin{codeblock}
+T v;
+
+auto        v1 = v; // T        -- v1 is a mutable copy of v
+auto const  v2 = v; // T const  -- v2 is a non-mutable copy of v
+auto\&       v3 = v; // \alert{T\&}       -- v3 is a \alert{mutable} alias of v
+auto const\& v4 = v; // T const\& -- v4 is a non-mutable alias of v\end{codeblock}
+
+  \begin{codeblock}
+T const v;
+
+auto        v1 = v; // T        -- v1 is a mutable copy of v
+auto const  v2 = v; // T const  -- v2 is a non-mutable copy of v
+auto\&       v3 = v; // \alert{T const\&} -- v3 is a \alert{non-mutable} alias of v
+auto const\& v4 = v; // T const\& -- v4 is a non-mutable alias of v\end{codeblock}
+
+\end{frame}
+
+\begin{frame}[fragile]{How to check the deduced type?}
+  \begin{itemize}
+  \item Trick by S. Meyers
+    \begin{codeblock}{
+template<typename T> struct D;
+
+auto k = 0U;
+D<decltype(k)> d; // error: aggregate 'D<\alert{unsigned int}> d'...
+
+auto const o = 0.;
+D<decltype(o)> d; // error: aggregate 'D<\alert{const double}> d'...
+
+auto const\& f = 0.f;
+D<decltype(f)> d; // error: aggregate 'D<\alert{const float\&}> td'...
+
+auto s = "hello";
+D<decltype(s)> d; // error: aggregate 'D<\alert{const char*}> d'...
+
+auto\& t = "hello";
+D<decltype(t)> d; // error: aggregate 'D<\alert{const char (\&)[6]}> d'...}\end{codeblock}
+
+  \item \code{decltype} returns the type of an expression
+    \begin{itemize}
+    \item at compile time
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\section*{More on lambda expressions}
+
+\begin{frame}[fragile]{Lambda: closure}
+  The evaluation of a lambda expression produces an unnamed function object (a
+  \textit{closure})
+  \begin{itemize}
+  \item The \texttt{operator()} corresponds to the code of the body of the
+    lambda expression
+  \item The data members are the captured local variables
+  \end{itemize}
+
+  \begin{columns}[t]
+    \begin{column}{.5\textwidth}
+      \begin{codeblock}<2->{
+\uncover<4-6>{int v = 3;}
+
+\uncover<2->{auto l = [}\temporal<5-6>{}{=}{v = 3}\uncover<2->{]}\uncover<3->{(\alt<-7>{int }{auto} i)\uncover<9->{\alert<9>{ -> int}}
+\{ return i + v; \}}
+
+\uncover<6->{auto r = l(5); // 8}}\end{codeblock}
+
+      \uncover<7>{}
+    \end{column}
+
+    \begin{column}{.5\textwidth}
+      \begin{codeblock}<2->{
+\uncover<2->{class SomeUniqueName \{
+  \uncover<5->{int v\_;}
+ public:
+  \uncover<5->{explicit SomeUniqueName(int v)
+    : v\_\{v\} \{\}}
+  \uncover<8->{template<typename T>}
+  \alt<-8>{auto}{\alert<9>{int }} operator()\uncover<3->{(\alt<-7>{int}{T  } i)
+  \{ return i + v\uncover<5->{\_}; \}}
+\};}
+
+\uncover<4->{int v = 3;}
+\uncover<2->{auto l = SomeUniqueName\{}\uncover<5->{v}\uncover<2->{\};}
+\uncover<6->{auto r = l(5); // 8}}\end{codeblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Lambda: capturing}
+
+  \begin{itemize}
+  \item Automatic variables used in the body need to be captured
+    \begin{itemize}
+    \item \texttt{[]} capture nothing
+    \item \texttt{[=]} capture all by value
+    \item \texttt{[k]} capture \texttt{k} by value
+    \item \texttt{[\&]} capture all by reference
+    \item \texttt{[\&k]} capture \texttt{k} by reference
+    \item \texttt{[=, \&k]} capture all by value but \texttt{k} by reference
+    \item \texttt{[\&, k]} capture all by reference but \texttt{k} by value
+    \end{itemize}
+
+    \begin{columns}[t]
+      \begin{column}{.5\textwidth}
+        \begin{codeblock}<2->{
+int v = 3;
+auto l = [\only<3->{\alert<3>{\&}}v] \{\};}\end{codeblock}
+      \end{column}
+
+      \begin{column}{.5\textwidth}
+        \begin{codeblock}<2->{
+class SomeUniqueName \{
+  int\only<3->{\alert<3>{\&}} v\_;
+ public:
+  explicit SomeUniqueName(int\only<3->{\alert<3>{\&}} v)
+    : v\_\{v\} \{\}
+  \ddd
+\};
+
+auto l = SomeUniqueName\{v\};}\end{codeblock}
+      \end{column}
+    \end{columns}
+  \item<4-> Global variables are available without being captured
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Lambda: \texttt{const} and \texttt{mutable}}
+  \begin{itemize}
+  \item By default the call to a lambda is \texttt{const}
+    \begin{itemize}
+    \item Variables captured by value are not modifiable
+    \end{itemize}
+  \item<2-> A lambda can be declared \texttt{mutable}
+  \end{itemize}
+
+  \begin{columns}
+    \begin{column}{.5\textwidth}
+      \begin{codeblock}<1->{
+[]\only<2->{\alert<2>{() mutable}}\only<3->{\alert<3>{ -> void}} \{\};}\end{codeblock}
+    \end{column}
+
+    \begin{column}{.5\textwidth}
+      \begin{codeblock}<1->{
+struct SomeUniqueName \{
+  \alt<-2>{auto}{\alert<3>{void}} operator()() \only<1>{\alert{const} }\{\}
+\};}\end{codeblock}
+    \end{column}
+  \end{columns}
+
+  \begin{itemize}
+  \item<4-> Variables captured by reference can be modified
+    \begin{itemize}
+    \item There is no way to capture by \texttt{const\&}
+    \end{itemize}
+  \end{itemize}
+
+  \begin{codeblock}<4->
+int v = 3;
+[\&v] \{ ++v; \}();
+assert(v == 4);\end{codeblock}
+
+\end{frame}
+
+\begin{frame}[fragile]{Lambda: dangling reference}
+
+  Be careful not to have dangling references in a closure
+  \begin{itemize}
+  \item It's similar to a function returning a reference to a local variable
+  \end{itemize}
+
+  \begin{codeblock}
+auto make\_lambda()
+\{
+  int v = 3;
+  return [\alert{&}] \{ return v; \}; // return a closure
+\}
+
+auto l = make\_lambda();
+auto d = l(); // the captured variable is dangling here\end{codeblock}
+
+  \begin{codeblock}
+auto start\_in\_thread()
+\{
+  int v = 3;
+  return std::async([\alert{&}] \{ return v; \});
+\}\end{codeblock}
+
+\end{frame}
+
+
+\section*{More on move}
+
+\begin{frame}[fragile]{Rvalue reference}
+  \begin{itemize}
+  \item A \textbf{\code{T\&\&}} is an rvalue reference
+    \begin{itemize}
+    \item introduced in C++11
+    \end{itemize}
+  \item It binds to rvalues but not to lvalues
+  \end{itemize}
+
+  \begin{codeblock}<2->{\tiny
+class Thing;
+Thing make\_thing();
+
+Thing t;
+
+\uncover<3->{Thing      &  r = t;}\uncover<4->{            // ok}
+\uncover<5->{Thing      && r = t;}\uncover<6->{            // error}
+\uncover<7->{Thing      &  r = make\_thing();}\uncover<8->{ // error}
+\uncover<9->{Thing      && r = make\_thing();}\uncover<10->{ // ok}
+\uncover<11->{Thing const&  r = make\_thing();}\uncover<12->{ // ok (!)}
+\uncover<13->{Thing const&& r = make\_thing();}\uncover<14->{ // ok, but what for?}}\end{codeblock}
+
+  \begin{codeblock}<15->{\tiny
+class String \{
+  // move constructor
+  String(String\alert<15>{&&} tmp) : s\_(tmp.s\_) \{
+    tmp.s\_ = nullptr;
+  \}
+\};
+
+String s2\{s1\};           // call String::String(String const&)
+String s3\{get\_string()\}; // call String::String(String&&)}\end{codeblock}
+
+\end{frame}
+
+\begin{frame}[fragile]{Rvalue reference \insertcontinuationtext}
+  \begin{itemize}
+  \item Any function can accept rvalue references
+    \begin{codeblock}
+void foo(String&&);
+
+foo(get\_string());
+foo(String\{"hello"\});\end{codeblock}
+  \item lvalues can be explicitly transformed into rvalues
+    \begin{codeblock}
+String s;
+foo(s);            // error
+foo(std::move(s)); // ok, I don't care any more about s
+s.size();          // dangerous\end{codeblock}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Overloading on \&\&}
+  \begin{itemize}
+  \item<1-> A function can be overloaded for temporaries
+    \begin{itemize}
+    \item useful if there are significant opportunities of optimization
+    \end{itemize}
+    \begin{codeblock}{\tiny
+void foo(Widget const&) \{\ddd\}
+void foo(Widget&&) \{\ddd\}
+
+Widget w\{\ddd\};
+foo(w);           // calls foo(Widget const&)
+foo(Widget\{\ddd\}); // calls foo(Widget&&)}\end{codeblock}
+  \item<2-> For more than one parameter it becomes less desirable
+    \begin{itemize}
+    \item consider pass by value, if move is cheap
+    \item especially useful for "sinks", e.g. in constructors
+      \begin{codeblock}{\tiny
+struct S \{
+  T1 t1\_; T2 t2\_;
+  S(T1 t1, T2 t2) : t1\_(std::move(t1)), t2\_(std::move(t2)) \{\ddd\}
+\};
+
+T1 t1; T2 t2;
+S s\{t1, make\_t2()\};
+S s\{make\_t1(), t2\};}\end{codeblock}
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+\begin{frame}[fragile]{Copy operations}
+
+  \begin{codeblock}{\tiny
+class Widget \{
+  \ddd
+  Widget(Widget const& other);
+  Widget& operator=(Widget const& other);
+\};}\end{codeblock}
+
+  \begin{description}[<2->]
+  \item [copy constructor] Allows the \alert{construction} of an object as a copy of another object
+
+    \begin{codeblock}<.->{\tiny
+Widget w1;
+Widget w2\{w1\};}\end{codeblock}
+
+  \item [copy assignment] Allows to change the value of an \alert{existing} object as a copy of another object
+
+    \begin{codeblock}<.->{\tiny
+Widget w1, w2;
+w2 = w1;}\end{codeblock}
+
+  \end{description}
+
+  \begin{itemize}[<3->]
+  \item The two objects are/remain distinct
+  \item The copied-from object is not changed
+  \item After the copy the two objects should compare equal
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Move operations}
+
+  \begin{codeblock}{\tiny
+class Widget \{
+  \ddd
+  Widget(Widget&& other);
+  Widget& operator=(Widget&& other);
+\};}\end{codeblock}
+
+  \begin{description}[<2->]
+  \item [move constructor] Allows the \alert{construction} of an object stealing
+    the internals of another object
+
+    \begin{codeblock}<.->{\tiny
+Widget w\{make\_widget()\};}\end{codeblock}
+
+  \item [move assignment] Allows to change the value of an \alert{existing}
+    object stealing the internals of another object
+
+    \begin{codeblock}<.->{\tiny
+Widget w;
+w = make\_widget();}\end{codeblock}
+
+  \end{description}
+
+  \begin{itemize}[<3->]
+  \item The two objects are/remain distinct
+  \item The moved-from object is usually changed
+    \begin{itemize}[<*>]
+    \item to a \textit{valid but unspecified} state
+    \item it must be at least destructible and possibly reassignable
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{On move}
+  \begin{itemize}
+  \item<1-> A move is typically cheaper than a copy, but it can be as expensive
+  \item<2-> If the \textit{Return Value Optimization} is not applied, the return
+    value of a function is moved, not copied, into destination
+  \item<3-> \code{operator=(T\&\&)} can assume that the argument is a temporary,
+    hence different from \code{this}
+    \begin{itemize}
+    \item There is no need to check for self-assignment
+    \item But be sure that in such event there is no crash
+    \item Rule of thumb: \code{std::swap} must work
+
+      \begin{codeblock}
+template<typename T>
+void swap(T& a, T& b) \{
+  T t\{std::move(a)\};
+  a = std::move(b);
+  b = std::move(t);
+\}\end{codeblock}
+
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{\code{= default}}
+  \begin{itemize}
+  \item Explicitly tell the compiler to generate a \underline{special member
+    function} according to the default implementation
+  \end{itemize}
+
+  \begin{codeblock}<2->
+class Widget \{
+  int i = 0;
+ public:
+  Widget(Widget const&);
+  \uncover<3->{Widget() \alert<3>{= default};}
+\};
+
+\uncover<2->{static\_assert(std::is\_copy\_constructible<Widget>::value);}
+\uncover<2->{static\_assert(\only<2>{!}std::is\_default\_constructible<Widget>::value);}\end{codeblock}
+
+\end{frame}
+
+\begin{frame}[fragile]{\code{= delete}}
+
+  \begin{itemize}
+  \item<1-> A function can be declared as \textit{deleted}, marking it with
+    \mbox{\alert{= delete}}
+  \item<2-> For example, a class can be made \alert{non copyable} deleting its
+    copy operations
+  \item<3-> Calling a deleted functions causes a compilation error
+  \item<5-> Any function can be deleted
+  \end{itemize}
+
+  \begin{codeblock}<1->
+template<typename P>
+class SmartPointer \{
+  \ddd
+  \textbf<3>{SmartPointer(SmartPointer const&) \alert<1>{= delete};}
+  \textbf<4>{SmartPointer& operator=(SmartPointer const&) \alert<1>{= delete};}
+\};
+
+\uncover<2->{using SPI = SmartPointer<int>;
+
+static\_assert(!std::is\_copy\_constructible<SPI>::value);
+static\_assert(!std::is\_copy\_assignable<SPI>::value);}
+
+\uncover<3->{SPI sp1, sp2;}
+\uncover<3->{SPI sp3\{sp1\}; // error}
+\uncover<4->{sp2 = sp1;    // error}\end{codeblock}
+
+\end{frame}
+
+\section*{Error management}
+
+\begin{frame}{Mechanisms for error management}
+
+  \centering\alert{The sooner the errors are identified, the better}
+
+  \begin{itemize}
+  \item \texttt{static\_assert}
+    \begin{itemize}
+    \item Logical assertion that must be valid at \underline{compile time}
+    \end{itemize}
+  \item \texttt{assert}
+    \begin{itemize}
+    \item Logical assertion that must be valid at \underline{run time}
+    \end{itemize}
+  \item Exceptions
+    \begin{itemize}
+    \item To express an error condition happening at \underline{run time},
+      typically related to a lack of resource
+    \end{itemize}
+    \item \color[rgb]{.6,.6,.6}{C-style error codes}
+      \begin{itemize}
+      \item \color[rgb]{.6,.6,.6}{They can be ignored (but they should not!)}
+      \end{itemize}
+    \item \ldots
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{static\_assert}}
+  Check that a certain constant boolean expression is satisfied during
+  compilation
+  \begin{itemize}
+  \item If not, fail compilation with the specified message
+  \end{itemize}
+
+  \begin{codeblock}<2->{
+#include <type\_traits>
+
+struct C \{
+  C(C const\&) = default;
+  C\& operator=(C const\&) = delete;
+\};
+
+\alert<2-3>{static\_assert(!std::is\_default\_constructible<C>::value, "");
+static\_assert( std::is\_copy\_constructible\_v<C>);
+static\_assert(!std::is\_copy\_assignable\_v<C>);
+static\_assert( std::is\_\only<3->{nothrow\_}move\_constructible\_v<C>);
+static\_assert(!std::is\_move\_assignable\_v<C>);
+static\_assert( std::is\_destructible\_v<C>);
+static\_assert(sizeof(C) == 1);}}\end{codeblock}
+
+  \uncover<4->{
+    A static assertion declaration can appear practically anywhere
+    \begin{itemize}
+    \item There is no effect, hence no overhead, at run time
+    \end{itemize}
+  }
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{assert}}
+
+  Check that a certain boolean expression is satisfied at run time
+  \begin{itemize}
+  \item If not satisfied, it means that the state of the program is corrupted
+    $\rightarrow$ better to close the program as soon as possible (calling
+    \code{std::abort})
+  \end{itemize}
+
+  \begin{codeblock}<2->{
+template<class T> class Vector \{
+  T* p;
+  \ddd
+  T\& operator[](int n) \{
+    \uncover<3->{\alert{assert(p != nullptr);         // class invariant (sort of)}}
+    \uncover<4->{\alert{assert(n >= 0 \&\& n < size()); // function pre-condition}}
+    return p[n];
+  \}
+\};}\end{codeblock}
+
+  \uncover<5->{
+    Useful during testing/debugging
+    \begin{itemize}
+    \item Can be disabled for performance reasons (\texttt{-DNDEBUG})
+    \item Avoid side effects in \texttt{assert}s
+    \end{itemize}
+  }
+\end{frame}
+
+\begin{frame}[fragile]{Exceptions}
+
+  \begin{itemize}
+  \item Mechanism to report errors out of a function, stopping its execution
+  \item Useful to express \textit{post-conditions}
+  \item Help separate application logic from error management
+  \end{itemize}
+
+  \begin{codeblock}<2->{
+class Thing \{\ddd\};
+\uncover<5->{class Exception \{\ddd\};}
+
+auto make\_thing() \{
+  \uncover<3->{auto res = acquire\_resources\_to\_build\_thing();}
+  \uncover<4->{if (!success(res)) \{}
+    \uncover<5-6>{Exception e\{\ddd\};}
+    \uncover<5->{throw \alt<-6>{e}{Exception\{\ddd\}};}
+  \uncover<4->{\}}
+  return Thing\{\uncover<3->{res}\}; \uncover<6->{// not executed in case of exception}
+\}}\end{codeblock}
+
+  \uncover<8->{Note that all local variables (e.g. \texttt{res}) are properly
+    destroyed when exiting the function, be it via \texttt{return} or via
+    \texttt{throw}}
+\end{frame}
+
+\begin{frame}[fragile]{Exception propagation}
+
+  \begin{columns}[t]
+
+    \begin{column}{.5\textwidth}
+      \begin{codeblock}
+\uncover<1->{auto high() \{}
+\uncover<9->{  try \{}
+\uncover<2->{    // this part is executed}
+\uncover<1->{    mid();}
+\uncover<10->{    // this part is not executed}
+\uncover<9->{  \} catch (E\alert<12>{\&} e) \{}\uncover<12->{ // \alert<12>{by reference}}
+\uncover<11->{    // use e}
+\uncover<9->{  \}}
+\uncover<1->{\}}
+
+\uncover<1->{auto mid() \{}
+\uncover<3->{  T t; // this part is executed}
+\uncover<1->{  low();}
+\uncover<7->{  // this part is not executed}
+\uncover<8->{  // \alert<8>{T is properly destroyed}}
+\uncover<1->{\}}
+
+\uncover<1->{auto low() \{}
+\uncover<4->{  // this part is executed}
+\uncover<5->{  throw E\{\};}
+\uncover<6->{  // this part is not executed}
+\uncover<1->{\}}\end{codeblock}
+    \end{column}
+
+    \begin{column}<13->{.5\textwidth}
+      \begin{itemize}
+      \item An exception is propagated up the stack of function calls until a
+        suitable catch clause is found
+      \item If no suitable catch clause is found the program is
+        \texttt{terminate}d
+      \item During stack unwinding all automatic objects are properly destroyed
+        \begin{itemize}
+        \item Remember smart pointers!
+        \end{itemize}
+      \end{itemize}
+    \end{column}
+
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Exception safety}
+
+  Different levels of safety guarantees (for member functions):
+
+  \begin{description}
+  \item [basic] If an exception is thrown, no resource is leaked and the object
+    is left in a \textit{valid but unspecified} state
+    \begin{itemize}
+    \item the object should be at least safely assignable and destroyable
+    \item every class should provide at least the basic guarantee
+    \end{itemize}
+  \item [strong] Transaction semantics: if an exception is thrown, the object's
+    state is as it was before the function was called
+  \item [no-throw] The operation is always successful and no exception leaves
+    the function
+  \end{description}
+
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{noexcept}}
+
+  \begin{itemize}
+  \item A function can be declared \texttt{noexcept}, telling the compiler that
+    the function
+    \begin{itemize}
+    \item doesn't throw, or
+    \item<2-> is not able to manage exceptions \uncover<3->{$\rightarrow$ better
+      \texttt{terminate}}
+    \end{itemize}
+
+    \begin{codeblock}<4->{
+class Handle \{
+  Handle(Handle\&\& o) \alert{noexcept} : \ddd \{ \ddd \}
+  \ddd
+\};}\end{codeblock}
+
+  \item<5-> Declaring functions (not only member functions) \texttt{noexcept} helps
+    the compiler to optimize the code
+  \item<5-> If move operations, especially the constructor, are \texttt{noexcept} the
+    compiler/library can apply \textbf{significant} optimizations
+    \begin{itemize}
+    \item E.g. in order to provide the strong guarantee
+      \texttt{std::vector::push\_back} must copy, not move, objects, if the move
+      can throw
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Move and \texttt{noexcept}}
+  \begin{itemize}
+  \item<1-> \texttt{T\& T::operator=(T\&\& tmp)} is typically easy to make
+    \texttt{noexcept}
+    \begin{itemize}
+    \item<2-> Rely on the \texttt{noexcept}-ness of data members' move-assignments
+    \end{itemize}
+  \item<3-> \texttt{T::T(T\&\& tmp)} may be more difficult
+    \begin{itemize}
+    \item<3-> Start with one object (\texttt{tmp}), end up with two (\texttt{*this}
+      and \texttt{tmp})
+    \item<4-> Can rely on \texttt{T::T()} being \texttt{noexcept} as well
+    \item<4-> Which is not obvious if a resource has to be acquired
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Destructor and \texttt{noexcept}}
+
+  \begin{itemize}
+  \item The destructor is by default \texttt{noexcept}
+    \begin{itemize}
+    \item i.e. releasing a resource should not fail
+    \end{itemize}
+  \item<2-> Don't do anything overly complicated in the destructor or swallow all
+    exceptions locally
+  \end{itemize}
+
+  \begin{codeblock}<3->
+class Thing \{
+  ~Thing()
+  \{
+    try \{
+      \vdots
+    \} catch (\alert{...}) \{ // catch \alert{all} exceptions
+      // e.g. log something, provided logging doesn't throw
+    \}
+  \}
+\};\end{codeblock}
+
+  \begin{itemize}
+  \item<4-> It's always possible to declare a destructor, like any other function,
+    \texttt{noexcept(false)}
+  \end{itemize}
+
+\end{frame}
