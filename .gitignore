@@ -10,3 +10,4 @@
 *.synctex.gz
 *.pdf
 .jekyll-cache
+.vscode
