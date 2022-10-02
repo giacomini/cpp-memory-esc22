@@ -1,0 +1,12 @@
+*.aux
+*.vrb
+*.toc
+*.fls
+*.nav
+*.log
+*.fdb_latexmk
+*.snm
+*.out
+*.synctex.gz
+*.pdf
+.jekyll-cache
